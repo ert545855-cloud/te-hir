@@ -31,9 +31,10 @@ header{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;padding
 .iconbtn{background:none;border:0;color:#fff;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:18px}
 .iconbtn:active{background:#ffffff22}
 .search{position:relative;margin:10px 0}
-.search input{width:100%;border:0;border-radius:var(--r);padding:12px 40px 12px 40px;background:#fff;color:var(--ink);font-size:16px;outline:none}
+.search input{width:100%;border:0;border-radius:var(--r);padding:12px 112px 12px 40px;background:#fff;color:var(--ink);font-size:16px;outline:none}
 .search .ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted)}
-.search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font-size:20px;width:32px;height:32px}
+.search .scan{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:var(--ink);color:#fff;border-radius:8px;height:36px;padding:0 10px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px}
+.search .clr{position:absolute;right:78px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font-size:20px;width:32px;height:32px}
 .tabs{display:flex;gap:4px}
 .tabs button{flex:1;border:0;background:none;color:#aab1bc;padding:10px 4px 11px;font-weight:600;border-bottom:3px solid transparent;font-size:14px}
 .tabs button.on{color:#fff;border-color:var(--teshir)}
@@ -141,6 +142,18 @@ dl.kv dt{color:var(--ink2);font-size:13px}dl.kv dd{margin:0;font-weight:600}
 .card{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
 .card h4{margin:0 0 8px;display:flex;align-items:center;gap:8px}
 
+#scanner{position:fixed;inset:0;z-index:70;background:#000;display:flex;flex-direction:column}
+#scanner .sbar{display:flex;align-items:center;gap:10px;color:#fff;padding:14px 16px;padding-top:max(14px,env(safe-area-inset-top))}
+#scanner .sbar b{font-size:17px}
+#scanner .sbar button{margin-left:auto;border:0;background:#ffffff22;color:#fff;border-radius:20px;padding:8px 16px;font-weight:700}
+#reader{flex:1;width:100%;overflow:hidden}
+#reader video{object-fit:cover}
+#scanner .shelp{color:#c9cfd8;text-align:center;padding:14px 20px max(20px,env(safe-area-inset-bottom));font-size:14px}
+#scanner .manual{display:flex;gap:8px;margin-top:10px}
+#scanner .manual input{flex:1;border:0;border-radius:10px;padding:11px;font-size:16px}
+#scanner .manual button{border:0;border-radius:10px;padding:0 16px;font-weight:800;background:var(--teshir)}
+.bcrow{display:flex;gap:8px}.bcrow .in{flex:1}
+.bcrow button{border:0;border-radius:var(--r);background:var(--ink);color:#fff;font-weight:700;padding:0 14px;white-space:nowrap}
 .toast{position:fixed;left:50%;top:max(14px,env(safe-area-inset-top));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:30px;z-index:60;font-size:14px;box-shadow:0 6px 18px #0004;max-width:90vw}
 .list{padding:0 0 120px}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 12px 10px}
@@ -161,8 +174,9 @@ dl.kv dt{color:var(--ink2);font-size:13px}dl.kv dd{margin:0;font-weight:600}
   </div>
   <div class="search">
     <span class="ico">⌕</span>
-    <input id="q" type="search" placeholder="Ürün adı, marka veya not ara…" autocomplete="off">
+    <input id="q" type="search" placeholder="Ürün, marka, barkod ara…" autocomplete="off">
     <button class="clr hidden" id="qClear" aria-label="Temizle">×</button>
+    <button class="scan" id="qScan" aria-label="Barkod okut"><span style="font-size:16px">▥</span> Okut</button>
   </div>
   <nav class="tabs" id="tabs">
     <button data-tab="magaza" class="on">Mağaza</button>
@@ -215,7 +229,7 @@ const thumbHtml = (p) => `<div class="thumb">${p.has_photo ? `<img loading="lazy
 function matches(p) {
   if (S.kind && p.kind !== S.kind) return false;
   if (!S.q) return true;
-  const hay = norm(`${p.name} ${p.brand || ''} ${p.note || ''} ${locShort(p)}`);
+  const hay = norm(`${p.name} ${p.brand || ''} ${p.note || ''} ${p.barcode || ''} ${locShort(p)}`);
   return norm(S.q).split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
 }
 
@@ -368,6 +382,7 @@ function openProduct(id) {
     <dl class="kv">
       <dt>Konum</dt><dd><span class="loc" style="margin:0"><b>${esc(p.shelf_code)}</b>${p.row_no}. sıra · ${p.level_no}. kat</span></dd>
       <dt>Marka</dt><dd>${esc(p.brand || '—')}</dd>
+      ${p.barcode ? `<dt>Barkod</dt><dd style="font-family:ui-monospace,monospace">${esc(p.barcode)}</dd>` : ''}
       <dt>Durum</dt><dd><span class="pill ${p.kind}">${KIND[p.kind]}</span></dd>
       <dt>Adet</dt><dd>${p.qty}</dd>
       ${p.note ? `<dt>Not</dt><dd>${esc(p.note)}</dd>` : ''}
@@ -405,7 +420,7 @@ function resizeImage(file, max, q) {
 function openForm(pre = {}) {
   const ed = pre.id ? S.products.find((x) => x.id === pre.id) : null;
   const f = {
-    name: ed?.name || '', brand: ed?.brand || '', kind: ed?.kind || pre.kind || 'teshir', qty: ed?.qty || 1, note: ed?.note || '',
+    name: ed?.name || pre.name || '', brand: ed?.brand || pre.brand || '', barcode: ed?.barcode || pre.barcode || '', kind: ed?.kind || pre.kind || 'teshir', qty: ed?.qty || 1, note: ed?.note || '',
     shelf_code: ed?.shelf_code || pre.shelf_code || '', row_no: ed?.row_no || pre.row_no || '', level_no: ed?.level_no || pre.level_no || 1,
     photo: null, thumb: null, locTouched: !!(ed || pre.shelf_code),
   };
@@ -417,6 +432,9 @@ function openForm(pre = {}) {
       <input type="file" accept="image/*" capture="environment" id="fFile">
     </div>
     ${S.aiEnabled ? `<button class="btn ai hidden" id="fAi">✨ Fotoğraftan adı ve markayı doldur</button>` : ''}
+    <label class="f">Barkod / karekod</label>
+    <div class="bcrow"><input class="in" id="fBarcode" value="${esc(f.barcode)}" inputmode="numeric" placeholder="Okut veya yaz"><button id="fScan">▥ Okut</button></div>
+    <div id="fBcHint"></div>
     <label class="f">Ürün adı</label><input class="in" id="fName" value="${esc(f.name)}" placeholder="ör. Tefal Ultragliss ütü">
     <div class="row2">
       <div><label class="f">Marka</label><input class="in" id="fBrand" list="brandList" value="${esc(f.brand)}"><datalist id="brandList">${brands.map((b) => `<option value="${esc(b)}">`).join('')}</datalist></div>
@@ -457,7 +475,23 @@ function openForm(pre = {}) {
     f.shelf_code = code; f.row_no = row; if (!auto) f.locTouched = true;
     $('#fShelf', el).value = code; $('#fRow', el).value = row; syncLevels(); brandHint();
   };
-  syncKind(); syncLevels(); brandHint();
+  const bcHint = () => {
+    const code = $('#fBarcode', el).value.trim();
+    const others = code ? S.products.filter((p) => p.barcode === code && (!ed || p.id !== ed.id)) : [];
+    if (others.length) {
+      const o = others[0];
+      if (!$('#fName', el).value.trim()) $('#fName', el).value = o.name;
+      if (!$('#fBrand', el).value.trim() && o.brand) { $('#fBrand', el).value = o.brand; brandHint(); }
+    }
+    $('#fBcHint', el).innerHTML = others.length
+      ? `<div class="hint">Bu ürün zaten kayıtlı: ${others.slice(0, 4).map((o) => `<b>${esc(locShort(o))}</b> (${KIND[o.kind]})`).join(', ')}</div>` : '';
+  };
+  $('#fBarcode', el).addEventListener('change', bcHint);
+  $('#fScan', el).onclick = async () => {
+    const code = await scanCode();
+    if (code) { $('#fBarcode', el).value = code; bcHint(); }
+  };
+  syncKind(); syncLevels(); brandHint(); bcHint();
 
   $('#fKind', el).onclick = (e) => { if (e.target.dataset.v) { f.kind = e.target.dataset.v; syncKind(); } };
   $('#fLevel', el).onclick = (e) => { if (e.target.dataset.v) { f.level_no = +e.target.dataset.v; f.locTouched = true; syncLevels(); } };
@@ -493,7 +527,7 @@ function openForm(pre = {}) {
 
   $('#fSave', el).onclick = async () => {
     const body = {
-      name: $('#fName', el).value.trim(), brand: $('#fBrand', el).value.trim(), kind: f.kind,
+      name: $('#fName', el).value.trim(), brand: $('#fBrand', el).value.trim(), barcode: $('#fBarcode', el).value.trim(), kind: f.kind,
       qty: $('#fQty', el).value, note: $('#fNote', el).value.trim(),
       shelf_code: f.shelf_code, row_no: f.row_no, level_no: f.level_no,
     };
@@ -572,6 +606,72 @@ function openSettings() {
 }
 const zoneRow = (z) => `<div class="zrow"><input class="in" value="${esc(z.brand)}" placeholder="Marka"><input class="in" type="number" value="${z.start_row}"><input class="in" type="number" value="${z.end_row}"><input type="color" class="in" value="${esc(z.color || '#475569')}"><button class="del">×</button></div>`;
 
+/* ---------- Barkod / karekod okuma ---------- */
+let qrLib;
+function loadQrLib() {
+  return qrLib ||= new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = '/vendor/html5-qrcode.min.js';
+    s.onload = () => res(window.Html5Qrcode); s.onerror = () => { qrLib = null; rej(new Error('Okuyucu yüklenemedi')); };
+    document.head.appendChild(s);
+  });
+}
+function cleanCode(t) {
+  t = String(t || '').trim();
+  // Karekod bir bağlantıysa içindeki barkod/GTIN numarasını almaya çalış
+  const m = /(?:^|[^\d])(\d{8,14})(?:[^\d]|$)/.exec(t);
+  if (/^https?:\/\//i.test(t) && m) return m[1];
+  return t;
+}
+function scanCode() {
+  return new Promise(async (resolve) => {
+    const box = document.createElement('div'); box.id = 'scanner';
+    box.innerHTML = `<div class="sbar"><b>Barkod / karekod okut</b><button id="scClose">Kapat</button></div>
+      <div id="reader"></div>
+      <div class="shelp">Kodu çerçevenin içine getirin
+        <div class="manual"><input id="scManual" inputmode="numeric" placeholder="ya da numarayı yazın"><button id="scOk">Ara</button></div></div>`;
+    document.body.appendChild(box);
+    let reader, done = false;
+    const finish = async (code) => {
+      if (done) return; done = true;
+      try { if (reader && reader.isScanning) await reader.stop(); } catch {}
+      box.remove(); resolve(code ? cleanCode(code) : null);
+    };
+    $('#scClose', box).onclick = () => finish(null);
+    $('#scOk', box).onclick = () => finish($('#scManual', box).value.trim() || null);
+    $('#scManual', box).onkeydown = (e) => { if (e.key === 'Enter') $('#scOk', box).click(); };
+    try {
+      const H = await loadQrLib();
+      if (done) return;
+      const F = window.Html5QrcodeSupportedFormats;
+      reader = new H('reader', {
+        formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.QR_CODE, F.DATA_MATRIX],
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }, verbose: false,
+      });
+      await reader.start({ facingMode: 'environment' },
+        { fps: 12, qrbox: (w, h) => ({ width: Math.floor(w * 0.85), height: Math.floor(Math.min(h, w) * 0.5) }) },
+        (text) => { if (navigator.vibrate) navigator.vibrate(60); finish(text); }, () => {});
+    } catch (e) {
+      $('.shelp', box).insertAdjacentHTML('afterbegin', `<div style="color:#fca5a5;margin-bottom:8px">Kamera açılamadı. Tarayıcıya kamera izni verin ya da numarayı elle yazın.</div>`);
+    }
+  });
+}
+async function scanSearch() {
+  const code = await scanCode();
+  if (!code) return;
+  const hits = S.products.filter((p) => p.barcode === code);
+  if (hits.length === 1) { $('#q').value = ''; S.q = ''; render(); return gotoProduct(hits[0].id); }
+  if (hits.length > 1) { $('#q').value = code; S.q = code; render(); return; }
+  sheet(`<div class="shtitle"><h2>Kayıtlı değil</h2><button class="x" onclick="closeSheet()">×</button></div>
+    <p style="margin:0 0 6px">Bu kodla kayıtlı ürün yok:</p>
+    <p style="font:700 18px ui-monospace,monospace;margin:0 0 14px;word-break:break-all">${esc(code)}</p>
+    <div class="actions">
+      <button class="btn" id="nsAdd">Yeni ürün olarak kaydet</button>
+      <button class="btn alt" id="nsCopy">Kodu kopyala</button>
+    </div>`);
+  $('#nsAdd').onclick = () => openForm({ barcode: code });
+  $('#nsCopy').onclick = async () => { try { await navigator.clipboard.writeText(code); toast('Kopyalandı'); } catch { toast('Kopyalanamadı'); } };
+}
+
 function askPin() {
   const v = prompt('Kayıt için ekip PIN kodunu girin:');
   if (v != null) { S.pin = v.trim(); localStorage.setItem('pin', S.pin); }
@@ -611,6 +711,7 @@ $('#tabs').onclick = (e) => { if (e.target.dataset.tab) { S.tab = e.target.datas
 document.querySelector('.bar').onclick = (e) => { if (e.target.dataset.kind !== undefined) { S.kind = e.target.dataset.kind; render(); } };
 $('#fab').onclick = () => openForm({});
 $('#btnSettings').onclick = openSettings;
+$('#qScan').onclick = scanSearch;
 document.addEventListener('click', (e) => {
   const g = e.target.closest('[data-goto]'); if (g) return gotoProduct(+g.dataset.goto);
   const o = e.target.closest('[data-open]'); if (o) return openProduct(+o.dataset.open);

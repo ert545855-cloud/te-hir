@@ -15,6 +15,10 @@ const KINDS = ['teshir', 'bos'];
 
 app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+app.get('/vendor/html5-qrcode.min.js', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=604800');
+  res.sendFile(require.resolve('html5-qrcode/html5-qrcode.min.js'));
+});
 
 // Yazma işlemleri için isteğe bağlı PIN
 function auth(req, res, next) {
@@ -32,6 +36,7 @@ function cleanProduct(b, partial) {
   const str = (v, max) => (v == null ? null : String(v).trim().slice(0, max));
   if (!partial || b.name !== undefined) out.name = str(b.name, 200);
   if (!partial || b.brand !== undefined) out.brand = str(b.brand, 100) || null;
+  if (!partial || b.barcode !== undefined) out.barcode = (str(b.barcode, 80) || '').replace(/\s+/g, '') || null;
   if (!partial || b.kind !== undefined) out.kind = KINDS.includes(b.kind) ? b.kind : 'teshir';
   if (!partial || b.qty !== undefined) out.qty = Math.max(0, Math.min(9999, parseInt(b.qty, 10) || 1));
   if (!partial || b.note !== undefined) out.note = str(b.note, 500) || null;

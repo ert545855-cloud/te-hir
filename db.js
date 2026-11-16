@@ -22,7 +22,7 @@ const DEFAULT_ZONES = [
   { shelf_code: 'D', brand: 'Boş Kutular', start_row: 1, end_row: 33, color: '#78716c' },
 ];
 
-const PRODUCT_COLS = 'id, name, brand, kind, qty, note, shelf_code, row_no, level_no, created_at, updated_at';
+const PRODUCT_COLS = 'id, name, brand, barcode, kind, qty, note, shelf_code, row_no, level_no, created_at, updated_at';
 
 function pgStore(url) {
   const { Pool } = require('pg');
@@ -45,7 +45,9 @@ function pgStore(url) {
         qty INT NOT NULL DEFAULT 1, note TEXT, shelf_code TEXT NOT NULL, row_no INT NOT NULL,
         level_no INT NOT NULL, thumb TEXT, photo TEXT,
         created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now())`);
+      await q(`ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode TEXT`);
       await q(`CREATE INDEX IF NOT EXISTS products_loc ON products(shelf_code, row_no, level_no)`);
+      await q(`CREATE INDEX IF NOT EXISTS products_barcode ON products(barcode)`);
       const { rows } = await q('SELECT count(*)::int AS n FROM shelves');
       if (rows[0].n === 0) {
         for (const s of DEFAULT_SHELVES) await this.saveShelf(s);
@@ -83,14 +85,14 @@ function pgStore(url) {
       return rows[0] ? rows[0].img : null;
     },
     async createProduct(p) {
-      const { rows } = await q(`INSERT INTO products(name,brand,kind,qty,note,shelf_code,row_no,level_no,thumb,photo)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${PRODUCT_COLS}, (photo IS NOT NULL) AS has_photo`,
-        [p.name, p.brand, p.kind, p.qty, p.note, p.shelf_code, p.row_no, p.level_no, p.thumb, p.photo]);
+      const { rows } = await q(`INSERT INTO products(name,brand,barcode,kind,qty,note,shelf_code,row_no,level_no,thumb,photo)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING ${PRODUCT_COLS}, (photo IS NOT NULL) AS has_photo`,
+        [p.name, p.brand, p.barcode, p.kind, p.qty, p.note, p.shelf_code, p.row_no, p.level_no, p.thumb, p.photo]);
       return rows[0];
     },
     async updateProduct(id, p) {
       const sets = []; const vals = [];
-      for (const k of ['name', 'brand', 'kind', 'qty', 'note', 'shelf_code', 'row_no', 'level_no', 'thumb', 'photo']) {
+      for (const k of ['name', 'brand', 'barcode', 'kind', 'qty', 'note', 'shelf_code', 'row_no', 'level_no', 'thumb', 'photo']) {
         if (p[k] !== undefined) { vals.push(p[k]); sets.push(`${k}=$${vals.length}`); }
       }
       vals.push(id);
